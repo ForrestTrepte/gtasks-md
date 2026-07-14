@@ -167,3 +167,8 @@ $ gtasks-md --help
 
 [^2]: Shamelessly stolen from
     [calendar.vim](https://github.com/itchyny/calendar.vim#important-notice)
+
+### VSCode Dev Containers
+
+1. Dev Containers: Clone Repository in Named Container Volume, enter repository URL e.g.` https://github.com/ForrestTrepte/gtasks-md.git`, enter name for volume e.g. `gtasks-md`.
+2. Open terminal and run via uv, e.g. `uv run gtasks-md --help`.

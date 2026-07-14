@@ -1,5 +1,5 @@
 {
-    "name": "PROJECT_NAME",
+    "name": "gtasks-md",
     "build": {
         "dockerfile": "../Dockerfile"
     },

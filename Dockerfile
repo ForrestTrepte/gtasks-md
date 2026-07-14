@@ -20,7 +20,8 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 ENV UV_PROJECT_ENVIRONMENT=/opt/venvs/python-docker-devcontainers
 COPY pyproject.toml uv.lock* ./
 COPY app ./app
-RUN uv sync --extra dev && rm -rf /tmp/build
+RUN uv sync --extra dev
+RUN rm -rf /tmp/build
 
 WORKDIR /workspaces
 
