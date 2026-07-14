@@ -13,7 +13,8 @@
 # limitations under the License.
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import date, timedelta
 from enum import StrEnum
 
 
@@ -91,3 +92,40 @@ class TaskList:
             "kind": "tasks#taskList",
             "title": self.title,
         }
+
+
+def filter_task_lists_due_soon(
+    task_lists: list[TaskList], days: int = 7, today: date | None = None
+) -> list[TaskList]:
+    """
+    Keeps only overdue, incomplete tasks and incomplete tasks due within the
+    next `days` days.
+
+    Completed tasks are never kept, since there's nothing left to pay
+    attention to. A task with no due date of its own is kept if it has a
+    subtask that matches, so the parent remains for context; task lists left
+    with no tasks after filtering are dropped.
+    """
+    cutoff = (today or date.today()) + timedelta(days=days)
+
+    def task_matches(task: Task) -> bool:
+        if task.completed():
+            return False
+        if not task.due:
+            return False
+        return date.fromisoformat(task.due.split("T")[0]) <= cutoff
+
+    def filter_tasks(tasks: list[Task]) -> list[Task]:
+        filtered = []
+        for task in tasks:
+            subtasks = filter_tasks(task.subtasks)
+            if task_matches(task) or subtasks:
+                filtered.append(replace(task, subtasks=subtasks))
+        return filtered
+
+    filtered_task_lists = []
+    for task_list in task_lists:
+        tasks = filter_tasks(task_list.tasks)
+        if tasks:
+            filtered_task_lists.append(replace(task_list, tasks=tasks))
+    return filtered_task_lists

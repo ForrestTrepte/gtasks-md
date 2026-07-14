@@ -24,6 +24,7 @@ from .backup import Backup
 from .editor import Editor
 from .googleapi import GoogleApiService
 from .pandoc import markdown_to_task_lists, task_lists_to_markdown
+from .tasks import filter_task_lists_due_soon
 
 
 def main():
@@ -59,7 +60,7 @@ def main():
             backup = Backup(args.user)
             rollback(service, backup)
         case "view":
-            view(service, args.due_dates)
+            view(service, args.due_dates, args.due_soon)
         case None:
             print("Please run one of the subcommands.")
 
@@ -139,6 +140,14 @@ def parse_args():
         action="store_true",
         help="Display due dates of tasks.",
     )
+    view_parser.add_argument(
+        "--due-soon",
+        dest="due_soon",
+        action="store_true",
+        help="Show only overdue tasks and tasks due within the next 7 days. "
+        "Completed tasks are never shown. A parent task is kept for context "
+        "if any of its subtasks match. Implies --due-dates.",
+    )
 
     return parser.parse_args()
 
@@ -147,8 +156,13 @@ def auth(service: GoogleApiService, file: str):
     service.save_credentials(Path(file).read_text(encoding="utf-8"))
 
 
-def view(service: GoogleApiService, show_due_dates: bool = False):
-    _, text = fetch_task_lists(service, show_due_dates)
+def view(
+    service: GoogleApiService, show_due_dates: bool = False, due_soon: bool = False
+):
+    task_lists, text = fetch_task_lists(service, show_due_dates)
+    if due_soon:
+        task_lists = filter_task_lists_due_soon(task_lists)
+        text = task_lists_to_markdown(task_lists, show_due_dates=True)
     print(text)
 
 

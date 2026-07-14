@@ -84,6 +84,11 @@ Pass `--due-dates` to append each task's due date (if set) to its title as a
 friendly relative string, e.g. `1.  [ ] Task 1 {Due: Tomorrow}` or
 `2.  [ ] Task 2 {Due: 4 days ago}` or `3.  [ ] Task 3 {Due: Thu, July 16}`.
 
+Pass `--due-soon` to show only overdue tasks and tasks due within the next 7
+days (implies `--due-dates`). Completed tasks are never shown, since there's
+nothing left to pay attention to. A parent task is kept for context if any
+of its subtasks match, even if the parent itself doesn't.
+
 ### edit
 
 ``` console
