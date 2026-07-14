@@ -28,6 +28,9 @@ from .tasks import Task, TaskList, TaskStatus
 
 CREDENTIALS_FILE = "credentials.json"
 SCOPES = ["https://www.googleapis.com/auth/tasks"]
+# Fixed port used when running inside a container so VS Code port-forwarding
+# can reliably relay the OAuth callback from the host browser.
+CONTAINER_OAUTH_PORT = 4444
 
 
 # https://googleapis.github.io/google-api-python-client/docs/dyn/tasks_v1.html
@@ -340,7 +343,6 @@ class GoogleApiService:
 
         return task_lists
 
-    # https://developers.google.com/tasks/quickstart/python#step_2_configure_the_sample
     def get_credentials(self) -> Credentials:
         """
         Read credentials from selected user configuration.
@@ -369,7 +371,24 @@ class GoogleApiService:
                 flow = InstalledAppFlow.from_client_secrets_file(
                     str(credentials_file), SCOPES
                 )
-                creds = flow.run_local_server(port=0)
+                # Always use a fixed callback port and bind on all interfaces
+                # so host browsers can reach the containerized process via
+                # VS Code port-forwarding.
+                logging.info(
+                    "Using OAuth local-server flow on %d (bind 0.0.0.0, host localhost).",
+                    CONTAINER_OAUTH_PORT,
+                )
+                print(
+                    "Starting OAuth callback server on "
+                    f"0.0.0.0:{CONTAINER_OAUTH_PORT} "
+                    "(redirect URI host: localhost)."
+                )
+                creds = flow.run_local_server(
+                    host="localhost",
+                    bind_addr="0.0.0.0",
+                    port=CONTAINER_OAUTH_PORT,
+                    open_browser=False,
+                )
             # Save the credentials for the next run
             token_file.write_text(creds.to_json(), encoding="utf-8")
 

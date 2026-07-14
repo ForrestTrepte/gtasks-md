@@ -170,5 +170,8 @@ $ gtasks-md --help
 
 ### VSCode Dev Containers
 
-1. Dev Containers: Clone Repository in Named Container Volume, enter repository URL e.g.` https://github.com/ForrestTrepte/gtasks-md.git`, enter name for volume e.g. `gtasks-md`.
-2. Open terminal and run via uv, e.g. `uv run gtasks-md --help`.
+1. Ensure Google tasks credentials file is located at OneDrive\\Development\\Crd\\250918_Desktop_OAuth_client_ID.json
+2. Dev Containers: Clone Repository in Named Container Volume, enter repository URL e.g.` https://github.com/ForrestTrepte/gtasks-md.git`, enter name for volume e.g. `gtasks-md`.
+3. Open terminal and run via uv, e.g. `uv run gtasks-md view`.
+
+`gtasks-md` uses a fixed OAuth callback port (4444), binds the callback listener to `0.0.0.0`, and skips opening a browser window. In dev containers, VS Code's automatic port-forwarding relays the OAuth redirect from your host browser to the server running inside the container.

@@ -12,7 +12,9 @@
             ]
         }
     },
+    "forwardPorts": [4444],
     "mounts": [
-        "source=claude-config,target=/root/.claude,type=volume"
+        "source=claude-config,target=/root/.claude,type=volume",
+        "source=${localEnv:USERPROFILE}\\OneDrive\\Development\\Crd\\250918_Desktop_OAuth_client_ID.json,target=/root/.local/share/gtasks-md/default/credentials.json,type=bind,readonly"
     ]
 }
