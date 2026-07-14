@@ -59,7 +59,7 @@ def main():
             backup = Backup(args.user)
             rollback(service, backup)
         case "view":
-            view(service)
+            view(service, args.due_dates)
         case None:
             print("Please run one of the subcommands.")
 
@@ -131,7 +131,14 @@ def parse_args():
     )
 
     subparsers.add_parser("rollback", help="Rollback last change.")
-    subparsers.add_parser("view", help="View Google Tasks.")
+
+    view_parser = subparsers.add_parser("view", help="View Google Tasks.")
+    view_parser.add_argument(
+        "--due-dates",
+        dest="due_dates",
+        action="store_true",
+        help="Display due dates of tasks.",
+    )
 
     return parser.parse_args()
 
@@ -140,8 +147,8 @@ def auth(service: GoogleApiService, file: str):
     service.save_credentials(Path(file).read_text(encoding="utf-8"))
 
 
-def view(service: GoogleApiService):
-    _, text = fetch_task_lists(service)
+def view(service: GoogleApiService, show_due_dates: bool = False):
+    _, text = fetch_task_lists(service, show_due_dates)
     print(text)
 
 
@@ -171,9 +178,9 @@ def rollback(service: GoogleApiService, backup: Backup):
         print("No backup found")
 
 
-def fetch_task_lists(service: GoogleApiService):
+def fetch_task_lists(service: GoogleApiService, show_due_dates: bool = False):
     task_lists = service.fetch_task_lists()
-    return task_lists, task_lists_to_markdown(task_lists)
+    return task_lists, task_lists_to_markdown(task_lists, show_due_dates)
 
 
 if __name__ == "__main__":

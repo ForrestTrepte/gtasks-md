@@ -307,6 +307,7 @@ class GoogleApiService:
                         int(fetched_task["position"]),
                         TaskStatus(fetched_task.get("status", "unknown")),
                         [],
+                        fetched_task.get("due", ""),
                     )
 
                     # If a task has a parent then it's definitely a subtask

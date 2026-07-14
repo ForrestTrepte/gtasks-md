@@ -33,7 +33,9 @@ EMPTY_ATTRS = ("", [], [])
 ORDERED_FIRST_ELEM = (1, Decimal(), Period())
 
 
-def task_lists_to_markdown(task_lists: list[TaskList]) -> str:
+def task_lists_to_markdown(
+    task_lists: list[TaskList], show_due_dates: bool = False
+) -> str:
     """Parses Task Lists to a Pandoc markdown"""
 
     def text_to_pandoc(text: str):
@@ -51,6 +53,9 @@ def task_lists_to_markdown(task_lists: list[TaskList]) -> str:
 
         task_sign = "☒" if task.completed() else "☐"
         task_title = [Str(task_sign), Space(), *text_to_pandoc(task.title)]
+        if show_due_dates and task.due:
+            due_date = task.due.split("T")[0]
+            task_title += [Space(), *text_to_pandoc(f"(Due: {due_date})")]
 
         if parent_contains_notes:
             pandoc_task.append(Para(task_title))

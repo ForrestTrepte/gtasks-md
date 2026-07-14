@@ -41,6 +41,7 @@ class Task:
     position: int
     status: TaskStatus
     subtasks: list[Task]
+    due: str = ""
 
     def __eq__(self, other: Task) -> bool:
         return (
