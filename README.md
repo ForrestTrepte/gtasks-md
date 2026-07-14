@@ -80,8 +80,9 @@ $ gtasks-md view
 
 Downloads all task lists, parses them to Markdown format and prints to stdout.
 
-Pass `--due-dates` to append each task's due date (if set) to its title, e.g.
-`1.  [ ] Task 1 (Due: 2026-07-20)`.
+Pass `--due-dates` to append each task's due date (if set) to its title as a
+friendly relative string, e.g. `1.  [ ] Task 1 {Due: Tomorrow}` or
+`2.  [ ] Task 2 {Due: 4 days ago}` or `3.  [ ] Task 3 {Due: Thu, July 16}`.
 
 ### edit
 

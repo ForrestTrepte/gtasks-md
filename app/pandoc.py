@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import datetime
+
 import pandoc
 from pandoc import types
 
@@ -31,6 +33,36 @@ Str = types.Str  # type: ignore
 
 EMPTY_ATTRS = ("", [], [])
 ORDERED_FIRST_ELEM = (1, Decimal(), Period())
+
+
+def format_due_date(due: str, today: datetime.date | None = None) -> str:
+    """Formats a Google Tasks due date (RFC 3339) as a friendly relative string."""
+    due_date = datetime.date.fromisoformat(due.split("T")[0])
+    today = today or datetime.date.today()
+    delta_days = (due_date - today).days
+
+    if delta_days == 0:
+        relative = "Today"
+    elif delta_days == 1:
+        relative = "Tomorrow"
+    elif delta_days == -1:
+        relative = "Yesterday"
+    elif delta_days < 0:
+        days_ago = -delta_days
+        if days_ago <= 14:
+            relative = f"{days_ago} days ago"
+        elif days_ago <= 60:
+            relative = f"{days_ago // 7} weeks ago"
+        else:
+            relative = f"{days_ago // 30} months ago"
+    else:
+        relative = (
+            f"{due_date.strftime('%a')}, {due_date.strftime('%B')} {due_date.day}"
+        )
+        if due_date.year != today.year:
+            relative += f", {due_date.year}"
+
+    return f"Due: {relative}"
 
 
 def task_lists_to_markdown(
@@ -54,8 +86,7 @@ def task_lists_to_markdown(
         task_sign = "☒" if task.completed() else "☐"
         task_title = [Str(task_sign), Space(), *text_to_pandoc(task.title)]
         if show_due_dates and task.due:
-            due_date = task.due.split("T")[0]
-            task_title += [Space(), *text_to_pandoc(f"(Due: {due_date})")]
+            task_title += [Space(), *text_to_pandoc(f"{{{format_due_date(task.due)}}}")]
 
         if parent_contains_notes:
             pandoc_task.append(Para(task_title))
