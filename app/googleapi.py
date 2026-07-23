@@ -20,7 +20,7 @@ from pathlib import Path
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google_auth_oauthlib.flow import InstalledAppFlow, WSGITimeoutError
 from googleapiclient.discovery import build
 from xdg import xdg_cache_home, xdg_data_home
 
@@ -31,6 +31,8 @@ SCOPES = ["https://www.googleapis.com/auth/tasks"]
 # Fixed port used when running inside a container so VS Code port-forwarding
 # can reliably relay the OAuth callback from the host browser.
 CONTAINER_OAUTH_PORT = 4444
+CALLBACK_HOST = "127.0.0.1"
+GOOGLE_AUTH_URI_V2 = "https://accounts.google.com/o/oauth2/v2/auth"
 
 
 # https://googleapis.github.io/google-api-python-client/docs/dyn/tasks_v1.html
@@ -41,11 +43,13 @@ class GoogleApiService:
         completed_after: datetime | None,
         completed_before: datetime | None,
         task_status: TaskStatus,
+        manual_auth: bool = False,
     ):
         self.user = user
         self.completed_after = completed_after
         self.completed_before = completed_before
         self.task_status = TaskStatus(task_status) if task_status else None
+        self.manual_auth = manual_auth
         self._service = None
 
     def tasks(self):
@@ -372,28 +376,84 @@ class GoogleApiService:
                 flow = InstalledAppFlow.from_client_secrets_file(
                     str(credentials_file), SCOPES
                 )
+                self._normalize_auth_uri(flow)
+                if self.manual_auth:
+                    logging.info("Using manual OAuth flow (--manual-auth).")
+                    creds = self._run_manual_auth_flow(flow)
+                    token_file.write_text(creds.to_json(), encoding="utf-8")
+                    return creds
+
                 # Always use a fixed callback port and bind on all interfaces
                 # so host browsers can reach the containerized process via
                 # VS Code port-forwarding.
                 logging.info(
-                    "Using OAuth local-server flow on %d (bind 0.0.0.0, host localhost).",
+                    "Using OAuth local-server flow on %d (bind 0.0.0.0, host %s).",
                     CONTAINER_OAUTH_PORT,
+                    CALLBACK_HOST,
                 )
                 print(
                     "Starting OAuth callback server on "
                     f"0.0.0.0:{CONTAINER_OAUTH_PORT} "
-                    "(redirect URI host: localhost)."
+                    f"(redirect URI host: {CALLBACK_HOST})."
                 )
-                creds = flow.run_local_server(
-                    host="localhost",
-                    bind_addr="0.0.0.0",
-                    port=CONTAINER_OAUTH_PORT,
-                    open_browser=False,
-                )
+                try:
+                    creds = flow.run_local_server(
+                        host=CALLBACK_HOST,
+                        bind_addr="0.0.0.0",
+                        port=CONTAINER_OAUTH_PORT,
+                        authorization_prompt_message=(
+                            "Please visit this URL to authorize this application: {url}"
+                        ),
+                        open_browser=False,
+                        timeout_seconds=300,
+                    )
+                except WSGITimeoutError:
+                    logging.warning(
+                        "OAuth local callback timed out. Falling back to manual "
+                        "authorization response paste flow."
+                    )
+                    creds = self._run_manual_auth_flow(
+                        flow,
+                        "OAuth callback timed out.",
+                    )
             # Save the credentials for the next run
             token_file.write_text(creds.to_json(), encoding="utf-8")
 
         return creds
+
+    @staticmethod
+    def _run_manual_auth_flow(
+        flow: InstalledAppFlow,
+        reason: str = "Manual OAuth mode requested.",
+    ) -> Credentials:
+        # Ensure Google receives an explicit redirect_uri in manual mode.
+        flow.redirect_uri = f"http://{CALLBACK_HOST}:{CONTAINER_OAUTH_PORT}/"
+
+        auth_url, _ = flow.authorization_url(
+            access_type="offline",
+            prompt="consent",
+            include_granted_scopes="true",
+        )
+
+        print(reason)
+        print(
+            "Open the following URL, complete authorization, then "
+            "paste the full redirected URL from your browser:"
+        )
+        print(auth_url)
+        authorization_response = input("Paste full redirected URL here: ").strip()
+        if not authorization_response:
+            raise RuntimeError("Missing authorization response URL from input.")
+        flow.fetch_token(authorization_response=authorization_response)
+        return flow.credentials
+
+    @staticmethod
+    def _normalize_auth_uri(flow: InstalledAppFlow):
+        """Use the current Google OAuth authorization endpoint when needed."""
+        client_config = flow.client_config.get("installed", flow.client_config)
+        auth_uri = client_config.get("auth_uri", "")
+        if auth_uri == "https://accounts.google.com/o/oauth2/auth":
+            client_config["auth_uri"] = GOOGLE_AUTH_URI_V2
 
     def save_credentials(self, credentials: str):
         """Save credentials to selected user config directory."""

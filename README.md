@@ -22,6 +22,9 @@ Markdown[^1]. See the following demo:
 
 All commands support `--user` flag which allows multi-user usage.
 
+Pass `--manual-auth` with any command to skip callback waiting and
+immediately use manual OAuth (paste redirected URL into terminal).
+
 ### auth
 
 ``` console
@@ -184,3 +187,14 @@ $ gtasks-md --help
 3. Open terminal and run via uv, e.g. `uv run gtasks-md view`.
 
 `gtasks-md` uses a fixed OAuth callback port (4444), binds the callback listener to `0.0.0.0`, and skips opening a browser window. In dev containers, VS Code's automatic port-forwarding relays the OAuth redirect from your host browser to the server running inside the container.
+
+If callback forwarding fails and the local OAuth server times out, `gtasks-md`
+falls back to manual flow: it prints a URL to open and then asks you to paste
+the full redirected browser URL back into the terminal.
+
+If you already know callback forwarding is unreliable in your setup, you can
+force manual flow up front:
+
+``` console
+gtasks-md --manual-auth view
+```

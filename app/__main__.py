@@ -44,7 +44,11 @@ def main():
     )
 
     service = GoogleApiService(
-        args.user, args.completed_after, args.completed_before, args.status
+        args.user,
+        args.completed_after,
+        args.completed_before,
+        args.status,
+        args.manual_auth,
     )
     match args.subcommand:
         case "auth":
@@ -101,6 +105,12 @@ def parse_args():
         help="Account for which the credentials are sourced. "
         "Should match desired Google account.",
         type=str,
+    )
+    parser.add_argument(
+        "--manual-auth",
+        dest="manual_auth",
+        action="store_true",
+        help="Skip callback waiting and prompt for pasted redirected URL.",
     )
 
     subparsers = parser.add_subparsers(dest="subcommand")
