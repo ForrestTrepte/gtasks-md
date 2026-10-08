@@ -18,6 +18,7 @@ import logging
 from datetime import timedelta
 from pathlib import Path
 
+from google.auth.exceptions import RefreshError
 from xdg import xdg_cache_home, xdg_data_home
 
 from .backup import Backup
@@ -43,26 +44,33 @@ def main():
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    service = GoogleApiService(
-        args.user, args.completed_after, args.completed_before, args.status
-    )
-    match args.subcommand:
-        case "auth":
-            auth(service, args.credentials_file)
-        case "edit":
-            editor = Editor(args.editor)
-            backup = Backup(args.user)
-            edit(service, editor, backup)
-        case "reconcile":
-            backup = Backup(args.user)
-            reconcile(service, args.file_path, backup)
-        case "rollback":
-            backup = Backup(args.user)
-            rollback(service, backup)
-        case "view":
-            view(service, args.due_dates, args.due_soon)
-        case None:
-            print("Please run one of the subcommands.")
+    try:
+        service = GoogleApiService(
+            args.user, args.completed_after, args.completed_before, args.status
+        )
+        match args.subcommand:
+            case "auth":
+                auth(service, args.credentials_file)
+            case "edit":
+                editor = Editor(args.editor)
+                backup = Backup(args.user)
+                edit(service, editor, backup)
+            case "reconcile":
+                backup = Backup(args.user)
+                reconcile(service, args.file_path, backup)
+            case "rollback":
+                backup = Backup(args.user)
+                rollback(service, backup)
+            case "view":
+                view(service, args.due_dates, args.due_soon)
+            case None:
+                print("Please run one of the subcommands.")
+    except RefreshError as e:
+        print(
+            """Google authentication failed because the cached token is expired or revoked. Delete the cached token and run the command again.
+In the typical container directory structure, this can be done by running the following in the terminal:
+rm ~/.cache/gtasks-md/default/token.json"""
+        )
 
 
 def parse_args():

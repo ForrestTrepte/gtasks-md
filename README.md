@@ -193,7 +193,7 @@ To fix it, delete the cached token file and re-run the command to go through the
 
 ``` console
 rm ~/.cache/gtasks-md/<user>/token.json
-gtasks-md view
+uv run gtasks-md view
 ```
 
 (`<user>` is `default` unless you passed `--user`.) To avoid the 7-day expiry, publish the OAuth consent screen from `Testing` to `Production` in the Google Cloud Console (`APIs & Services` > `OAuth consent screen`); for a single-user tool using only the Tasks scope this typically doesn't require Google's verification review.
