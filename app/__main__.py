@@ -19,6 +19,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from google.auth.exceptions import RefreshError
+from google_auth_oauthlib.flow import WSGITimeoutError
 from xdg import xdg_cache_home, xdg_data_home
 
 from .backup import Backup
@@ -70,6 +71,11 @@ def main():
             """Google authentication failed because the cached token is expired or revoked. Delete the cached token and run the command again.
 In the typical container directory structure, this can be done by running the following in the terminal:
 rm ~/.cache/gtasks-md/default/token.json"""
+        )
+    except WSGITimeoutError:
+        print(
+            "Timed out waiting for a response from the authorization server. "
+            "Not sure why this sometimes happens, but try running the command again, perhaps after rebooting the PC."
         )
 
 
