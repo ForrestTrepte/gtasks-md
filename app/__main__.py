@@ -18,12 +18,15 @@ import logging
 from datetime import timedelta
 from pathlib import Path
 
+from google.auth.exceptions import RefreshError
+from google_auth_oauthlib.flow import WSGITimeoutError
 from xdg import xdg_cache_home, xdg_data_home
 
 from .backup import Backup
 from .editor import Editor
 from .googleapi import GoogleApiService
 from .pandoc import markdown_to_task_lists, task_lists_to_markdown
+from .tasks import filter_task_lists_due_soon
 
 
 def main():
@@ -42,26 +45,38 @@ def main():
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    service = GoogleApiService(
-        args.user, args.completed_after, args.completed_before, args.status
-    )
-    match args.subcommand:
-        case "auth":
-            auth(service, args.credentials_file)
-        case "edit":
-            editor = Editor(args.editor)
-            backup = Backup(args.user)
-            edit(service, editor, backup)
-        case "reconcile":
-            backup = Backup(args.user)
-            reconcile(service, args.file_path, backup)
-        case "rollback":
-            backup = Backup(args.user)
-            rollback(service, backup)
-        case "view":
-            view(service)
-        case None:
-            print("Please run one of the subcommands.")
+    try:
+        service = GoogleApiService(
+            args.user, args.completed_after, args.completed_before, args.status
+        )
+        match args.subcommand:
+            case "auth":
+                auth(service, args.credentials_file)
+            case "edit":
+                editor = Editor(args.editor)
+                backup = Backup(args.user)
+                edit(service, editor, backup)
+            case "reconcile":
+                backup = Backup(args.user)
+                reconcile(service, args.file_path, backup)
+            case "rollback":
+                backup = Backup(args.user)
+                rollback(service, backup)
+            case "view":
+                view(service, args.due_dates, args.due_soon)
+            case None:
+                print("Please run one of the subcommands.")
+    except RefreshError as e:
+        print(
+            """Google authentication failed because the cached token is expired or revoked. Delete the cached token and run the command again.
+In the typical container directory structure, this can be done by running the following in the terminal:
+rm ~/.cache/gtasks-md/default/token.json"""
+        )
+    except WSGITimeoutError:
+        print(
+            "Timed out waiting for a response from the authorization server. "
+            "Not sure why this sometimes happens, but try running the command again, perhaps after rebooting the PC."
+        )
 
 
 def parse_args():
@@ -131,7 +146,22 @@ def parse_args():
     )
 
     subparsers.add_parser("rollback", help="Rollback last change.")
-    subparsers.add_parser("view", help="View Google Tasks.")
+
+    view_parser = subparsers.add_parser("view", help="View Google Tasks.")
+    view_parser.add_argument(
+        "--due-dates",
+        dest="due_dates",
+        action="store_true",
+        help="Display due dates of tasks.",
+    )
+    view_parser.add_argument(
+        "--due-soon",
+        dest="due_soon",
+        action="store_true",
+        help="Show only overdue tasks and tasks due within the next 7 days. "
+        "Completed tasks are never shown. A parent task is kept for context "
+        "if any of its subtasks match. Implies --due-dates.",
+    )
 
     return parser.parse_args()
 
@@ -140,8 +170,13 @@ def auth(service: GoogleApiService, file: str):
     service.save_credentials(Path(file).read_text(encoding="utf-8"))
 
 
-def view(service: GoogleApiService):
-    _, text = fetch_task_lists(service)
+def view(
+    service: GoogleApiService, show_due_dates: bool = False, due_soon: bool = False
+):
+    task_lists, text = fetch_task_lists(service, show_due_dates)
+    if due_soon:
+        task_lists = filter_task_lists_due_soon(task_lists)
+        text = task_lists_to_markdown(task_lists, show_due_dates=True)
     print(text)
 
 
@@ -171,9 +206,9 @@ def rollback(service: GoogleApiService, backup: Backup):
         print("No backup found")
 
 
-def fetch_task_lists(service: GoogleApiService):
+def fetch_task_lists(service: GoogleApiService, show_due_dates: bool = False):
     task_lists = service.fetch_task_lists()
-    return task_lists, task_lists_to_markdown(task_lists)
+    return task_lists, task_lists_to_markdown(task_lists, show_due_dates)
 
 
 if __name__ == "__main__":

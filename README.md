@@ -80,6 +80,15 @@ $ gtasks-md view
 
 Downloads all task lists, parses them to Markdown format and prints to stdout.
 
+Pass `--due-dates` to append each task's due date (if set) to its title as a
+friendly relative string, e.g. `1.  [ ] Task 1 {Due: Tomorrow}` or
+`2.  [ ] Task 2 {Due: 4 days ago}` or `3.  [ ] Task 3 {Due: Thu, July 16}`.
+
+Pass `--due-soon` to show only overdue tasks and tasks due within the next 7
+days (implies `--due-dates`). Completed tasks are never shown, since there's
+nothing left to pay attention to. A parent task is kept for context if any
+of its subtasks match, even if the parent itself doesn't.
+
 ### edit
 
 ``` console
@@ -172,6 +181,19 @@ $ gtasks-md --help
 
 1. Ensure Google tasks credentials file is located at OneDrive\\Development\\Crd\\250918_Desktop_OAuth_client_ID.json
 2. Dev Containers: Clone Repository in Named Container Volume, enter repository URL e.g.` https://github.com/ForrestTrepte/gtasks-md.git`, enter name for volume e.g. `gtasks-md`.
-3. Open terminal and run via uv, e.g. `uv run gtasks-md view`.
+3. Open terminal and run via uv, e.g. `uv run gtasks-md view` or `uv run gtasks-md view --due-soon.
 
 `gtasks-md` uses a fixed OAuth callback port (4444), binds the callback listener to `0.0.0.0`, and skips opening a browser window. In dev containers, VS Code's automatic port-forwarding relays the OAuth redirect from your host browser to the server running inside the container.
+
+### Token expired or revoked
+
+If a command fails with `google.auth.exceptions.RefreshError: invalid_grant: Token has been expired or revoked.`, the cached token is stale. This commonly happens because the Google Cloud project's OAuth consent screen is in `Testing` publishing status, where refresh tokens expire after 7 days regardless of use.
+
+To fix it, delete the cached token file and re-run the command to go through the OAuth flow again:
+
+``` console
+rm ~/.cache/gtasks-md/<user>/token.json
+uv run gtasks-md view
+```
+
+(`<user>` is `default` unless you passed `--user`.) To avoid the 7-day expiry, publish the OAuth consent screen from `Testing` to `Production` in the Google Cloud Console (`APIs & Services` > `OAuth consent screen`); for a single-user tool using only the Tasks scope this typically doesn't require Google's verification review.
