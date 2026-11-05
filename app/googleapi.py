@@ -13,10 +13,13 @@
 # limitations under the License.
 import asyncio
 import logging
+import wsgiref.simple_server
+import wsgiref.util
 from collections import defaultdict
 from datetime import datetime
 from enum import Enum, auto
 from pathlib import Path
+from urllib.parse import parse_qs
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -31,6 +34,50 @@ SCOPES = ["https://www.googleapis.com/auth/tasks"]
 # Fixed port used when running inside a container so VS Code port-forwarding
 # can reliably relay the OAuth callback from the host browser.
 CONTAINER_OAUTH_PORT = 4444
+
+
+def _run_local_server(flow, host: str, bind_addr: str, port: int):
+    """Like InstalledAppFlow.run_local_server, but robust to stray connections.
+
+    The library version serves exactly one request. VS Code's port forwarder
+    (and browser preconnects) sometimes open a connection to the port and close
+    it without sending anything; that consumes the single request, the server
+    shuts down, the library raises a misleading WSGITimeoutError, and the real
+    redirect later gets ERR_EMPTY_RESPONSE. Here we keep serving until a request
+    carrying the OAuth ``code`` or ``error`` parameter arrives.
+    """
+    redirect = {}
+
+    def app(environ, start_response):
+        query = parse_qs(environ.get("QUERY_STRING", ""))
+        if "code" in query or "error" in query:
+            redirect["uri"] = wsgiref.util.request_uri(environ)
+            body = b"Authorization complete. You may close this window."
+            start_response("200 OK", [("Content-type", "text/plain; charset=utf-8")])
+        else:
+            body = b"Waiting for OAuth redirect."
+            start_response("404 Not Found", [("Content-type", "text/plain")])
+        return [body]
+
+    class QuietHandler(wsgiref.simple_server.WSGIRequestHandler):
+        def log_message(self, format, *args):
+            logging.info(format, *args)
+
+    wsgiref.simple_server.WSGIServer.allow_reuse_address = False
+    server = wsgiref.simple_server.make_server(
+        bind_addr, port, app, handler_class=QuietHandler
+    )
+    try:
+        flow.redirect_uri = f"http://{host}:{server.server_port}/"
+        auth_url, _ = flow.authorization_url(access_type="offline")
+        print(f"Please visit this URL to authorize this application: {auth_url}")
+        while "uri" not in redirect:
+            server.handle_request()
+        # oauthlib insists on https for the authorization response.
+        flow.fetch_token(authorization_response=redirect["uri"].replace("http", "https", 1))
+    finally:
+        server.server_close()
+    return flow.credentials
 
 
 # https://googleapis.github.io/google-api-python-client/docs/dyn/tasks_v1.html
@@ -384,11 +431,11 @@ class GoogleApiService:
                     f"0.0.0.0:{CONTAINER_OAUTH_PORT} "
                     "(redirect URI host: localhost)."
                 )
-                creds = flow.run_local_server(
+                creds = _run_local_server(
+                    flow,
                     host="localhost",
                     bind_addr="0.0.0.0",
                     port=CONTAINER_OAUTH_PORT,
-                    open_browser=False,
                 )
             # Save the credentials for the next run
             token_file.write_text(creds.to_json(), encoding="utf-8")
